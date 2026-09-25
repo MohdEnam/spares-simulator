@@ -211,7 +211,7 @@ export function GpuSparingUnitComparison({ params }: { params: GpuParams }) {
   const whole = (v: number) => "$" + v.toLocaleString("en-US", { maximumFractionDigits: 0 });
   return (
     <section>
-      <SectionTitle>GPU sparing unit: module vs board</SectionTitle>
+      <SectionTitle>GPU sparing unit: module vs HGX board</SectionTitle>
       <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
         <table className="w-full min-w-[720px] text-sm">
           <thead>

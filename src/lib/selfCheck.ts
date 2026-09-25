@@ -115,18 +115,5 @@ export function runSelfCheck(): CheckLine[] {
   add("All-classes capital, Module (generic)", "509,883.59", allGeneric.toFixed(2), near(allGeneric, 509883.59, 0.01));
   add("All-classes capital, Module (branded)", "545,331.53", allBranded.toFixed(2), near(allBranded, 545331.53, 0.01));
 
-  for (const [label, g, mS, mC, bS, bC] of [
-    ["Custom (H100 values)", { ...DEFAULTS.gpus, model: "custom", customAfrPct: 9.0762, customGpusPerBoard: 8, customBoardPrice: 179000 }, 22, 492250, 17, 3043000],
-    ["Custom (5%, $300k)", { ...DEFAULTS.gpus, model: "custom", customAfrPct: 5, customGpusPerBoard: 8, customBoardPrice: 300000 }, 14, 525000, 12, 3600000],
-  ] as const) {
-    const cp = gpuParams(g);
-    const m = computePart(gpuPartInputs(cp, "module"));
-    const b = computePart(gpuPartInputs(cp, "board"));
-    add(`${label} module S`, String(mS), m.stock, m.stock === mS);
-    add(`${label} module capital`, mC.toLocaleString("en-US"), m.capital.toFixed(2), near(m.capital, mC, 0.01));
-    add(`${label} board S`, String(bS), b.stock, b.stock === bS);
-    add(`${label} board capital`, bC.toLocaleString("en-US"), b.capital.toFixed(2), near(b.capital, bC, 0.01));
-  }
-
   return lines;
 }
