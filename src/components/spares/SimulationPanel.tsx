@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { classSeed, simulate, simulateScenarios, type ScenarioSummary, type PartInputs, type PartResult, type SimResult } from "@/lib/sparesModel";
+import { SIM_DAYS_PER_YEAR, classSeed, simulate, simulateScenarios, type ScenarioSummary, type PartInputs, type PartResult, type SimResult } from "@/lib/sparesModel";
 
 export interface SimClass {
   name: string;
@@ -32,7 +32,7 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
     setYear(
       classes.map((c, i) => ({
         name: c.name,
-        sim: simulate(c.input, c.result.stock, 52, classSeed(seed, i)),
+        sim: simulate(c.input, c.result.stock, SIM_DAYS_PER_YEAR, classSeed(seed, i)),
       })),
     );
   };
@@ -187,7 +187,7 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
             </table>
           </div>
           <p className="text-xs text-muted-foreground">
-            Each scenario is one data center over the chosen horizon. Averages land within about 1 point of the model; the spread shows how often a single year misses target.
+            Each scenario is one data center over the chosen horizon, simulated day by day. Averages land within about half a point of the model; the spread shows how often a single year misses target.
           </p>
         </div>
       )}
