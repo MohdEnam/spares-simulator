@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { simulate, type PartInputs, type PartResult, type SimResult } from "@/lib/sparesModel";
+import { classSeed, simulate, type PartInputs, type PartResult, type SimResult } from "@/lib/sparesModel";
 
 export interface SimClass {
   name: string;
