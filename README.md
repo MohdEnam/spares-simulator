@@ -4,7 +4,7 @@ How many spare drives, power supplies, optics and GPUs should a data center keep
 
 This app answers that with a Poisson base-stock model, checks the answer with a day-by-day simulation, and shows every source behind every number.
 
-**Live app:** [spares-simulator.lovable.app](https://spares-simulator.lovable.app) · **Excel reference model:** [`docs/spares_model.xlsx`](docs/spares_model.xlsx)
+**Live app:** [spares-simulator.lovable.app](https://spares-simulator.lovable.app) · **Excel reference model:** [`docs/spares_model.xlsx`](docs/spares_model.xlsx) · **Case study:** [Co-packaged optics and the spares shelf](docs/cpo-case-study.md)
 
 ---
 
