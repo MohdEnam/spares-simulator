@@ -158,6 +158,11 @@ export function validatePart(
 
 /* ---------------- simulation ---------------- */
 
+/** Independent per-class seed: seed*3 + (classIndex+1). 0=drives, 1=PSUs, 2=optics. */
+export function classSeed(seed: number, classIndex: number): number {
+  return seed * 3 + classIndex + 1;
+}
+
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return function () {

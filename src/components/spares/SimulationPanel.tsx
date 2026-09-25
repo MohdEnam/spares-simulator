@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { simulate, type PartInputs, type PartResult, type SimResult } from "@/lib/sparesModel";
+import { classSeed, simulate, type PartInputs, type PartResult, type SimResult } from "@/lib/sparesModel";
 
 export interface SimClass {
   name: string;
@@ -29,9 +29,9 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
 
   const runYear = () => {
     setYear(
-      classes.map((c) => ({
+      classes.map((c, i) => ({
         name: c.name,
-        sim: simulate(c.input, c.result.stock, 52, seed),
+        sim: simulate(c.input, c.result.stock, 52, classSeed(seed, i)),
       })),
     );
   };
@@ -40,13 +40,13 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
     setBusy(true);
     setTimeout(() => {
       setLong(
-        classes.map((c) => ({
+        classes.map((c, i) => ({
           name: c.name,
           sim: simulate(
             c.input,
             c.result.stock,
             52000,
-            seed,
+            classSeed(seed, i),
             Math.max(1, Math.round(c.input.leadTimeWeeks)),
             false,
           ),
