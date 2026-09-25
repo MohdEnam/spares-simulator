@@ -5,14 +5,17 @@ export interface NamedResult {
   result: PartResult;
 }
 
-const num = (v: number, d = 2) =>
-  v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
-const money = (v: number) => "$" + num(v, 2);
-const pct = (v: number) => (v * 100).toFixed(2) + "%";
+const NOT_FOUND = "No stock level found - check inputs";
+const num = (v: number | null, d = 2) =>
+  v === null ? NOT_FOUND : v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const money = (v: number | null) => (v === null ? NOT_FOUND : "$" + num(v, 2));
+const pct = (v: number | null) => (v === null ? NOT_FOUND : (v * 100).toFixed(2) + "%");
 
 export function ResultsTable({ rows }: { rows: NamedResult[] }) {
   const totalFailures = rows.reduce((s, r) => s + r.result.expectedFailuresPerYear, 0);
-  const totalCapital = rows.reduce((s, r) => s + r.result.capital, 0);
+  const anyMissing = rows.some((r) => r.result.stock === null);
+  const totalCapital = anyMissing ? null : rows.reduce((s, r) => s + (r.result.capital ?? 0), 0);
+  const totalStock = anyMissing ? null : rows.reduce((s, r) => s + (r.result.stock ?? 0), 0);
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
@@ -36,8 +39,8 @@ export function ResultsTable({ rows }: { rows: NamedResult[] }) {
               <td className="px-4 py-3 font-sans font-medium">{r.name}</td>
               <td className="px-4 py-3 text-right">{num(r.result.expectedFailuresPerYear, 2)}</td>
               <td className="px-4 py-3 text-right">{num(r.result.lambda, 4)}</td>
-              <td className="px-4 py-3 text-right font-semibold text-primary">{r.result.stock}</td>
-              <td className="px-4 py-3 text-right">{r.result.reorderPoint}</td>
+              <td className="px-4 py-3 text-right font-semibold text-primary">{r.result.stock ?? NOT_FOUND}</td>
+              <td className="px-4 py-3 text-right">{r.result.reorderPoint ?? NOT_FOUND}</td>
               <td className="px-4 py-3 text-right">{num(r.result.safetyStock, 2)}</td>
               <td className="px-4 py-3 text-right">{pct(r.result.achievedFillRate)}</td>
               <td className="px-4 py-3 text-right">{pct(r.result.cycleServiceLevel)}</td>
@@ -48,7 +51,7 @@ export function ResultsTable({ rows }: { rows: NamedResult[] }) {
             <td className="px-4 py-3 font-sans">Total</td>
             <td className="px-4 py-3 text-right">{num(totalFailures, 2)}</td>
             <td className="px-4 py-3 text-right text-muted-foreground">—</td>
-            <td className="px-4 py-3 text-right">{rows.reduce((s, r) => s + r.result.stock, 0)}</td>
+            <td className="px-4 py-3 text-right">{totalStock ?? NOT_FOUND}</td>
             <td className="px-4 py-3 text-right text-muted-foreground">—</td>
             <td className="px-4 py-3 text-right text-muted-foreground">—</td>
             <td className="px-4 py-3 text-right text-muted-foreground">—</td>

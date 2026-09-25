@@ -30,10 +30,11 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
 
   const runYear = () => {
     setYear(
-      classes.map((c, i) => ({
-        name: c.name,
-        sim: simulate(c.input, c.result.stock, SIM_DAYS_PER_YEAR, classSeed(seed, i)),
-      })),
+      classes.flatMap((c, i) =>
+        c.result.stock === null
+          ? []
+          : [{ name: c.name, sim: simulate(c.input, c.result.stock, SIM_DAYS_PER_YEAR, classSeed(seed, i)) }],
+      ),
     );
   };
 
@@ -41,10 +42,11 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
     setBusy(true);
     setTimeout(() => {
       setLong(
-        classes.map((c, i) => ({
-          name: c.name,
-          sum: simulateScenarios(c.input, c.result.stock, c.input.targetFillRate, horizon, 1000, seed, i),
-        })),
+        classes.flatMap((c, i) =>
+          c.result.stock === null
+            ? []
+            : [{ name: c.name, sum: simulateScenarios(c.input, c.result.stock, c.input.targetFillRate, horizon, 1000, seed, i) }],
+        ),
       );
       setBusy(false);
     }, 0);

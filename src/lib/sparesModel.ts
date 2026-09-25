@@ -1,6 +1,5 @@
 export const WEEKS_PER_YEAR = 52;
 export const HOURS_PER_YEAR = 8760;
-export const MAX_STOCK_SEARCH = 1000;
 
 export interface PartInputs {
   fleetSize: number;
@@ -26,32 +25,65 @@ export function leadTimeDemand(
   return (expectedFailuresPerYear(fleetSize, afr) * leadTimeWeeks) / WEEKS_PER_YEAR;
 }
 
+const LANCZOS_G = 7;
+const LANCZOS_C = [
+  0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+  -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6,
+  1.5056327351493116e-7,
+] as const;
+
+/** Lanczos approximation of ln(Gamma(x)) for x > 0. */
+export function lnGamma(x: number): number {
+  if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lnGamma(1 - x);
+  const z = x - 1;
+  let a = LANCZOS_C[0];
+  const t = z + LANCZOS_G + 0.5;
+  for (let i = 1; i < LANCZOS_C.length; i++) a += (LANCZOS_C[i] ?? 0) / (z + i);
+  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(a);
+}
+
+/** log P(X = k) for X ~ Poisson(lambda), computed in log space. */
+export function poissonLogPmf(k: number, lambda: number): number {
+  if (lambda <= 0) return k === 0 ? 0 : -Infinity;
+  return k * Math.log(lambda) - lambda - lnGamma(k + 1);
+}
+
 export function poissonCdf(k: number, lambda: number): number {
   if (k < 0) return 0;
   const n = Math.floor(k);
-  let term = Math.exp(-lambda);
-  let sum = term;
-  for (let i = 1; i <= n; i++) {
-    term = (term * lambda) / i;
-    sum += term;
-  }
+  let sum = 0;
+  for (let i = 0; i <= n; i++) sum += Math.exp(poissonLogPmf(i, lambda));
   return Math.min(sum, 1);
 }
 
-/** Smallest S >= 1 with poissonCdf(S - 1, lambda) >= targetFillRate */
-export function recommendedStock(lambda: number, targetFillRate: number): number {
-  for (let s = 1; s <= MAX_STOCK_SEARCH; s++) {
-    if (poissonCdf(s - 1, lambda) >= targetFillRate) return s;
-  }
-  return MAX_STOCK_SEARCH;
+/** Upper bound for stock searches: ceil(lambda + 10*sqrt(lambda) + 20). */
+export function stockSearchLimit(lambda: number): number {
+  return Math.ceil(lambda + 10 * Math.sqrt(Math.max(0, lambda)) + 20);
 }
 
-/** Smallest S with poissonCdf(S, lambda) >= level (cycle-service basis) */
-export function stockForCycleServiceLevel(lambda: number, level: number): number {
-  for (let s = 0; s <= MAX_STOCK_SEARCH; s++) {
-    if (poissonCdf(s, lambda) >= level) return Math.max(1, s);
+/**
+ * Smallest S >= 1 with poissonCdf(S - 1, lambda) >= targetFillRate.
+ * One pass, accumulating the pmf. Returns null if none found within the search limit.
+ */
+export function recommendedStock(lambda: number, targetFillRate: number): number | null {
+  const max = stockSearchLimit(lambda);
+  let cdf = 0;
+  for (let s = 1; s <= max; s++) {
+    cdf = Math.min(1, cdf + Math.exp(poissonLogPmf(s - 1, lambda)));
+    if (cdf >= targetFillRate) return s;
   }
-  return MAX_STOCK_SEARCH;
+  return null;
+}
+
+/** Smallest S with poissonCdf(S, lambda) >= level (cycle-service basis); null if none found. */
+export function stockForCycleServiceLevel(lambda: number, level: number): number | null {
+  const max = stockSearchLimit(lambda);
+  let cdf = 0;
+  for (let s = 0; s <= max; s++) {
+    cdf = Math.min(1, cdf + Math.exp(poissonLogPmf(s, lambda)));
+    if (cdf >= level) return Math.max(1, s);
+  }
+  return null;
 }
 
 /** Acklam's rational approximation of the inverse standard normal CDF. */
@@ -107,12 +139,13 @@ export function normalStock(lambda: number, targetFillRate: number): number {
 export interface PartResult {
   expectedFailuresPerYear: number;
   lambda: number;
-  stock: number;
-  reorderPoint: number;
-  safetyStock: number;
-  achievedFillRate: number;
-  cycleServiceLevel: number;
-  capital: number;
+  /** null when no stock level was found within the search limit. */
+  stock: number | null;
+  reorderPoint: number | null;
+  safetyStock: number | null;
+  achievedFillRate: number | null;
+  cycleServiceLevel: number | null;
+  capital: number | null;
   normalStock: number;
   normalFillRate: number;
 }
@@ -126,11 +159,11 @@ export function computePart(input: PartInputs): PartResult {
     expectedFailuresPerYear: failures,
     lambda,
     stock: s,
-    reorderPoint: s - 1,
-    safetyStock: s - lambda,
-    achievedFillRate: poissonCdf(s - 1, lambda),
-    cycleServiceLevel: poissonCdf(s, lambda),
-    capital: s * input.unitCost,
+    reorderPoint: s === null ? null : s - 1,
+    safetyStock: s === null ? null : s - lambda,
+    achievedFillRate: s === null ? null : poissonCdf(s - 1, lambda),
+    cycleServiceLevel: s === null ? null : poissonCdf(s, lambda),
+    capital: s === null ? null : s * input.unitCost,
     normalStock: sNormal,
     normalFillRate: poissonCdf(sNormal - 1, lambda),
   };
@@ -175,8 +208,8 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-/** Knuth's method — fine for small lambda. */
-export function poissonSample(lambda: number, rng: () => number): number {
+/** Knuth's method for one chunk (mean <= 30). */
+function knuthSample(lambda: number, rng: () => number): number {
   const L = Math.exp(-lambda);
   let k = 0;
   let p = 1;
@@ -185,6 +218,19 @@ export function poissonSample(lambda: number, rng: () => number): number {
     p *= rng();
   } while (p > L);
   return k - 1;
+}
+
+export const POISSON_SAMPLE_CHUNK = 30;
+
+/** Poisson draw; means above 30 are split into ceil(mean/30) equal Knuth chunks and summed. */
+export function poissonSample(lambda: number, rng: () => number): number {
+  if (!(lambda > 0)) return 0;
+  if (lambda <= POISSON_SAMPLE_CHUNK) return knuthSample(lambda, rng);
+  const chunks = Math.ceil(lambda / POISSON_SAMPLE_CHUNK);
+  const part = lambda / chunks;
+  let total = 0;
+  for (let i = 0; i < chunks; i++) total += knuthSample(part, rng);
+  return total;
 }
 
 export interface SimResult {
@@ -389,11 +435,11 @@ export function gpuPartInputs(p: GpuParams, unit: GpuSparingUnit): PartInputs {
 
 export interface GpuUnitComparison {
   gpuAfr: number;
-  moduleStock: number;
-  moduleCapital: number;
+  moduleStock: number | null;
+  moduleCapital: number | null;
   boardAfr: number;
-  boardStock: number;
-  boardCapital: number;
+  boardStock: number | null;
+  boardCapital: number | null;
 }
 
 export function compareGpuSparingUnits(p: GpuParams): GpuUnitComparison {
