@@ -40,7 +40,9 @@ export const Route = createFileRoute("/")({
 const CARD_CLASS = "rounded-lg border border-border bg-card p-5 shadow-sm";
 
 function Index() {
-  const [form, setForm] = useState<FormState>(DEFAULTS);
+  const [rawForm, setForm] = useState<FormState>(DEFAULTS);
+  // Fill any section missing from older saved state (e.g. after a live reload) with defaults.
+  const form: FormState = { ...DEFAULTS, ...rawForm };
 
   const psuAfrValue = psuAfr(form.psus.mtbfHours);
   const opticsCost = OPTICS_PRICES[form.optics.pricing];
@@ -112,7 +114,7 @@ function Index() {
   };
 
   const set = <K extends keyof FormState>(key: K, patch: Partial<FormState[K]>) =>
-    setForm((f) => ({ ...f, [key]: { ...f[key], ...patch } }));
+    setForm((f) => ({ ...DEFAULTS, ...f, [key]: { ...DEFAULTS[key], ...f[key], ...patch } }));
 
   return (
     <div className="min-h-screen bg-background">
