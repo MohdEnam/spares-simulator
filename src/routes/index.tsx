@@ -15,6 +15,9 @@ import { SelfCheckPanel } from "@/components/spares/SelfCheckPanel";
 import { DEFAULTS, GPU_AFR, OPTICS_PRICES, gpuClassName, gpuParams, psuAfr, type FormState } from "@/lib/defaults";
 import { boardAfr, computePart, gpuPartInputs, validatePart, type PartInputs } from "@/lib/sparesModel";
 
+const META_DESCRIPTION =
+  "Size spare drives, PSUs, 800G optics and H100 GPUs for a data center fleet: Poisson base-stock model, capital view, module vs board GPU sparing, and a day-by-day 1,000-scenario simulation. Every input sourced or labeled.";
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
