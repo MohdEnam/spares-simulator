@@ -10,9 +10,15 @@ import {
 } from "@/lib/sparesModel";
 import type { NamedResult } from "./ResultsTable";
 
-const money = (v: number) =>
-  "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const pct = (v: number) => (v * 100).toFixed(2) + "%";
+const NOT_FOUND = "No stock level found - check inputs";
+const money = (v: number | null) =>
+  v === null || Number.isNaN(v)
+    ? NOT_FOUND
+    : "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = (v: number | null) => (v === null ? NOT_FOUND : (v * 100).toFixed(2) + "%");
+const addN = (...vs: (number | null)[]) =>
+  vs.some((v) => v === null) ? null : vs.reduce<number>((a, v) => a + (v ?? 0), 0);
+const mulN = (a: number | null, b: number) => (a === null ? null : a * b);
 
 function SectionTitle({ children, note }: { children: React.ReactNode; note?: string }) {
   return (
@@ -54,6 +60,14 @@ export function PoissonVsNormal({
           <tbody className="font-mono">
             {rows.map(({ name, result }) => {
               const cost = costs[name] ?? 0;
+              if (result.stock === null) {
+                return (
+                  <tr key={name} className="border-b border-border/70 last:border-0">
+                    <td className="px-4 py-3 font-sans font-medium">{name}</td>
+                    <td colSpan={5} className="px-4 py-3 font-sans text-destructive">{NOT_FOUND}</td>
+                  </tr>
+                );
+              }
               const dUnits = result.normalStock - result.stock;
               const dCapital = dUnits * cost;
               const understocks = result.normalFillRate < (targets[name] ?? 0);
@@ -97,25 +111,25 @@ export function OpticsPriceComparison({
   drives: PartResult;
   psus: PartResult;
   gpus: PartResult;
-  opticsStock: number;
+  opticsStock: number | null;
 }) {
   const build = (k: OpticsPricing) => {
-    const opticsCapital = opticsStock * OPTICS_PRICES[k];
+    const opticsCapital = mulN(opticsStock, OPTICS_PRICES[k]);
     return {
       key: k,
       label:
         k === "generic"
           ? `Generic (${money(OPTICS_PRICES.generic)})`
           : `Branded (${money(OPTICS_PRICES.branded)})`,
-      driveOptics: drives.capital + opticsCapital,
-      all: drives.capital + opticsCapital + psus.capital + gpus.capital,
+      driveOptics: addN(drives.capital, opticsCapital),
+      all: addN(drives.capital, opticsCapital, psus.capital, gpus.capital),
     };
   };
   const generic = build("generic");
   const branded = build("branded");
   const rows = [generic, branded];
-  const diffDriveOptics = branded.driveOptics - generic.driveOptics;
-  const diffAll = branded.all - generic.all;
+  const diffDriveOptics = addN(branded.driveOptics, mulN(generic.driveOptics, -1));
+  const diffAll = addN(branded.all, mulN(generic.all, -1));
 
   return (
     <section>
@@ -166,9 +180,9 @@ export function OpticsSensitivity({ optics }: { optics: PartInputs }) {
       afr,
       lambda,
       s,
-      fill: poissonCdf(s - 1, lambda),
-      generic: s * OPTICS_PRICES.generic,
-      branded: s * OPTICS_PRICES.branded,
+      fill: s === null ? null : poissonCdf(s - 1, lambda),
+      generic: mulN(s, OPTICS_PRICES.generic),
+      branded: mulN(s, OPTICS_PRICES.branded),
     };
   });
 
@@ -193,7 +207,7 @@ export function OpticsSensitivity({ optics }: { optics: PartInputs }) {
               <tr key={r.afr} className="border-b border-border/70 last:border-0">
                 <td className="px-4 py-3">{(r.afr * 100).toFixed(0)}%</td>
                 <td className="px-4 py-3 text-right">{r.lambda.toFixed(4)}</td>
-                <td className="px-4 py-3 text-right font-semibold text-primary">{r.s}</td>
+                <td className="px-4 py-3 text-right font-semibold text-primary">{r.s ?? NOT_FOUND}</td>
                 <td className="px-4 py-3 text-right">{money(r.generic)}</td>
                 <td className="px-4 py-3 text-right">{money(r.branded)}</td>
               </tr>
@@ -228,17 +242,17 @@ export function GpuSparingUnitComparison({ params, custom }: { params: GpuParams
             {rows.map((r, i) => (
               <tr key={i} className="border-b border-border/70 last:border-0">
                 <td className="px-4 py-3">{pct(r.gpuAfr)}</td>
-                <td className="px-4 py-3 text-right font-semibold text-primary">{r.moduleStock}</td>
+                <td className="px-4 py-3 text-right font-semibold text-primary">{r.moduleStock ?? NOT_FOUND}</td>
                 <td className="px-4 py-3 text-right">{money(r.moduleCapital)}</td>
                 <td className="px-4 py-3 text-right">{pct(r.boardAfr)}</td>
-                <td className="px-4 py-3 text-right font-semibold text-primary">{r.boardStock}</td>
+                <td className="px-4 py-3 text-right font-semibold text-primary">{r.boardStock ?? NOT_FOUND}</td>
                 <td className="px-4 py-3 text-right">{money(r.boardCapital)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {base && base.moduleCapital > 0 && (
+      {base && base.moduleCapital !== null && base.boardCapital !== null && base.moduleCapital > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
           {custom ? "At the entered AFR" : "At the base case"}, sparing whole boards ties up{" "}
           {(base.boardCapital / base.moduleCapital).toFixed(1)}x the
