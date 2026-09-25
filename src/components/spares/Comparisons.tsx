@@ -205,7 +205,7 @@ export function OpticsSensitivity({ optics }: { optics: PartInputs }) {
   );
 }
 
-export function GpuSparingUnitComparison({ params }: { params: GpuParams }) {
+export function GpuSparingUnitComparison({ params, custom }: { params: GpuParams; custom?: boolean | undefined }) {
   const rows = [0.02, 0.05, params.gpuAfr].map((afr) => compareGpuSparingUnits({ ...params, gpuAfr: afr }));
   const base = rows[2];
   const whole = (v: number) => "$" + v.toLocaleString("en-US", { maximumFractionDigits: 0 });
