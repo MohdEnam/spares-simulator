@@ -26,9 +26,11 @@ function SectionTitle({ children, note }: { children: React.ReactNode; note?: st
 export function PoissonVsNormal({
   rows,
   costs,
+  targets,
 }: {
   rows: NamedResult[];
   costs: Record<string, number>;
+  targets: Record<string, number>;
 }) {
   return (
     <section>
@@ -52,8 +54,7 @@ export function PoissonVsNormal({
               const cost = costs[name] ?? 0;
               const dUnits = result.normalStock - result.stock;
               const dCapital = dUnits * cost;
-              const understocks = result.normalFillRate < result.achievedFillRate - 1e-12 &&
-                result.normalStock < result.stock;
+              const understocks = result.normalFillRate < (targets[name] ?? 0);
               return (
                 <tr key={name} className="border-b border-border/70 last:border-0">
                   <td className="px-4 py-3 font-sans font-medium">{name}</td>
