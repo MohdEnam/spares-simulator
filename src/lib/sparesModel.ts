@@ -408,3 +408,12 @@ export function compareGpuSparingUnits(p: GpuParams): GpuUnitComparison {
     boardCapital: b.capital,
   };
 }
+
+/** Validate user-entered custom GPU values. */
+export function validateCustomGpu(afrPct: number, gpusPerBoard: number, boardPrice: number) {
+  const out: { field: string; message: string }[] = [];
+  if (!(afrPct >= 0.01 && afrPct <= 100)) out.push({ field: "customAfrPct", message: "Per-GPU AFR must be between 0.01% and 100%" });
+  if (!(gpusPerBoard >= 1)) out.push({ field: "customGpusPerBoard", message: "GPUs per board must be at least 1" });
+  if (!(boardPrice > 0)) out.push({ field: "customBoardPrice", message: "Board price must be greater than 0" });
+  return out;
+}
