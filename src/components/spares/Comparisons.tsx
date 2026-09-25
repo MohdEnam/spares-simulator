@@ -240,7 +240,8 @@ export function GpuSparingUnitComparison({ params, custom }: { params: GpuParams
       </div>
       {base && base.moduleCapital > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
-          At the base case, sparing whole boards ties up {(base.boardCapital / base.moduleCapital).toFixed(1)}x the
+          {custom ? "At the entered AFR" : "At the base case"}, sparing whole boards ties up{" "}
+          {(base.boardCapital / base.moduleCapital).toFixed(1)}x the
           capital of sparing modules ({whole(base.boardCapital)} vs {whole(base.moduleCapital)}).
         </p>
       )}
