@@ -491,7 +491,7 @@ function Index() {
 
             <OpticsSensitivity optics={inputs.Optics} />
 
-            <GpuSparingUnitComparison params={gpuP} />
+            <GpuSparingUnitComparison params={gpuP} custom={isCustom} />
 
             <section>
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
