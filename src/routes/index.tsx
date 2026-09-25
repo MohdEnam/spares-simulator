@@ -114,7 +114,7 @@ function Index() {
   };
 
   const set = <K extends keyof FormState>(key: K, patch: Partial<FormState[K]>) =>
-    setForm((f) => ({ ...f, [key]: { ...f[key], ...patch } }));
+    setForm((f) => ({ ...DEFAULTS, ...f, [key]: { ...DEFAULTS[key], ...f[key], ...patch } }));
 
   return (
     <div className="min-h-screen bg-background">
