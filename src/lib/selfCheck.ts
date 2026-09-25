@@ -1,7 +1,10 @@
-import { DEFAULTS, OPTICS_PRICES, psuAfr } from "./defaults";
+import { DEFAULTS, GPU_AFR, OPTICS_PRICES, gpuParams, psuAfr } from "./defaults";
 import {
   afrFromMtbf,
+  boardAfr,
+  compareGpuSparingUnits,
   computePart,
+  gpuPartInputs,
   leadTimeDemand,
   recommendedStock,
   stockForCycleServiceLevel,
@@ -85,10 +88,32 @@ export function runSelfCheck(): CheckLine[] {
   add("Drive + optics capital (generic)", "15,508.95", driveOpticsGeneric.toFixed(2), near(driveOpticsGeneric, 15508.95, 0.01));
   add("Drive + optics capital (branded)", "50,956.89", driveOpticsBranded.toFixed(2), near(driveOpticsBranded, 50956.89, 0.01));
 
-  const allGeneric = driveOpticsGeneric + p.capital;
-  const allBranded = driveOpticsBranded + p.capital;
-  add("All-classes capital (generic)", "17,633.59", allGeneric.toFixed(2), near(allGeneric, 17633.59, 0.01));
-  add("All-classes capital (branded)", "53,081.53", allBranded.toFixed(2), near(allBranded, 53081.53, 0.01));
+  const gp = gpuParams(DEFAULTS.gpus);
+  add("Per-GPU AFR", "0.090762", GPU_AFR.toFixed(6), near(GPU_AFR, 0.090762, 1e-6));
+  const bAfr = boardAfr(GPU_AFR, gp.gpusPerBoard);
+  add("Board AFR", "0.532887", bAfr.toFixed(6), near(bAfr, 0.532887, 1e-6));
+  const gm = computePart(gpuPartInputs(gp, "module"));
+  add("GPU module lambda", "14.2984", gm.lambda.toFixed(4), near(gm.lambda, 14.2984, 1e-4));
+  add("GPU module S", "22", gm.stock, gm.stock === 22);
+  add("GPU module capital", "492,250", gm.capital.toFixed(2), near(gm.capital, 492250, 0.01));
+  const gb = computePart(gpuPartInputs(gp, "board"));
+  add("GPU board lambda", "10.4938", gb.lambda.toFixed(4), near(gb.lambda, 10.4938, 1e-4));
+  add("GPU board S", "17", gb.stock, gb.stock === 17);
+  add("GPU board capital", "3,043,000", gb.capital.toFixed(2), near(gb.capital, 3043000, 0.01));
+  for (const [afr, label, mExp, bExp] of [
+    [0.02, "2%", 7, 7],
+    [0.05, "5%", 14, 12],
+    [GPU_AFR, "9.08%", 22, 17],
+  ] as const) {
+    const c = compareGpuSparingUnits({ ...gp, gpuAfr: afr });
+    add(`GPU AFR ${label} -> module S`, String(mExp), c.moduleStock, c.moduleStock === mExp);
+    add(`GPU AFR ${label} -> board S`, String(bExp), c.boardStock, c.boardStock === bExp);
+  }
+
+  const allGeneric = driveOpticsGeneric + p.capital + gm.capital;
+  const allBranded = driveOpticsBranded + p.capital + gm.capital;
+  add("All-classes capital, Module (generic)", "509,883.59", allGeneric.toFixed(2), near(allGeneric, 509883.59, 0.01));
+  add("All-classes capital, Module (branded)", "545,331.53", allBranded.toFixed(2), near(allBranded, 545331.53, 0.01));
 
   return lines;
 }

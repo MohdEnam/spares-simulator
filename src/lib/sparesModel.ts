@@ -160,6 +160,7 @@ export function validatePart(
 
 /** Independent per-class seed: seed*3 + (classIndex+1). 0=drives, 1=PSUs, 2=optics. */
 export function classSeed(seed: number, classIndex: number): number {
+  if (classIndex === 3) return gpuClassSeed(seed); // GPUs: seed*3 + 1000003
   return seed * 3 + classIndex + 1;
 }
 
@@ -325,5 +326,75 @@ export function simulateScenarios(
     pctYearsMeetingTarget: yearCount > 0 ? yearsMet / yearCount : 1,
     worstYearFillRate: worst,
     avgStockoutsPerYear: yearCount > 0 ? (totFail - totFilled) / yearCount : 0,
+  };
+}
+
+/* ---------------- GPUs ---------------- */
+
+export const GPU_SIM_SEED_OFFSET = 1000003;
+
+/** Independent GPU stream seed: seed*3 + 1000003. */
+export function gpuClassSeed(seed: number): number {
+  return seed * 3 + GPU_SIM_SEED_OFFSET;
+}
+
+export function gpuAfrFromInterruptions(interruptions: number, clusterGpus: number, days: number): number {
+  return ((interruptions / clusterGpus) * 365) / days;
+}
+
+/** One GPU failure takes the whole board out. */
+export function boardAfr(gpuAfr: number, gpusPerBoard: number): number {
+  return 1 - Math.pow(1 - gpuAfr, gpusPerBoard);
+}
+
+export type GpuSparingUnit = "module" | "board";
+
+export interface GpuParams {
+  gpusInstalled: number;
+  gpusPerBoard: number;
+  boardPrice: number;
+  gpuAfr: number;
+  leadTimeWeeks: number;
+  targetFillRate: number;
+}
+
+export function gpuPartInputs(p: GpuParams, unit: GpuSparingUnit): PartInputs {
+  if (unit === "module") {
+    return {
+      fleetSize: p.gpusInstalled,
+      afr: p.gpuAfr,
+      leadTimeWeeks: p.leadTimeWeeks,
+      targetFillRate: p.targetFillRate,
+      unitCost: p.boardPrice / p.gpusPerBoard,
+    };
+  }
+  return {
+    fleetSize: p.gpusInstalled / p.gpusPerBoard,
+    afr: boardAfr(p.gpuAfr, p.gpusPerBoard),
+    leadTimeWeeks: p.leadTimeWeeks,
+    targetFillRate: p.targetFillRate,
+    unitCost: p.boardPrice,
+  };
+}
+
+export interface GpuUnitComparison {
+  gpuAfr: number;
+  moduleStock: number;
+  moduleCapital: number;
+  boardAfr: number;
+  boardStock: number;
+  boardCapital: number;
+}
+
+export function compareGpuSparingUnits(p: GpuParams): GpuUnitComparison {
+  const m = computePart(gpuPartInputs(p, "module"));
+  const b = computePart(gpuPartInputs(p, "board"));
+  return {
+    gpuAfr: p.gpuAfr,
+    moduleStock: m.stock,
+    moduleCapital: m.capital,
+    boardAfr: boardAfr(p.gpuAfr, p.gpusPerBoard),
+    boardStock: b.stock,
+    boardCapital: b.capital,
   };
 }

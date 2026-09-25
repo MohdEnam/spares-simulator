@@ -1,5 +1,7 @@
 import { OPTICS_PRICES, type OpticsPricing } from "@/lib/defaults";
 import {
+  compareGpuSparingUnits,
+  type GpuParams,
   leadTimeDemand,
   poissonCdf,
   recommendedStock,
@@ -89,10 +91,12 @@ export function PoissonVsNormal({
 export function OpticsPriceComparison({
   drives,
   psus,
+  gpus,
   opticsStock,
 }: {
   drives: PartResult;
   psus: PartResult;
+  gpus: PartResult;
   opticsStock: number;
 }) {
   const build = (k: OpticsPricing) => {
@@ -104,7 +108,7 @@ export function OpticsPriceComparison({
           ? `Generic (${money(OPTICS_PRICES.generic)})`
           : `Branded (${money(OPTICS_PRICES.branded)})`,
       driveOptics: drives.capital + opticsCapital,
-      all: drives.capital + opticsCapital + psus.capital,
+      all: drives.capital + opticsCapital + psus.capital + gpus.capital,
     };
   };
   const generic = build("generic");
@@ -197,6 +201,49 @@ export function OpticsSensitivity({ optics }: { optics: PartInputs }) {
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+export function GpuSparingUnitComparison({ params }: { params: GpuParams }) {
+  const rows = [0.02, 0.05, params.gpuAfr].map((afr) => compareGpuSparingUnits({ ...params, gpuAfr: afr }));
+  const base = rows[2];
+  const whole = (v: number) => "$" + v.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return (
+    <section>
+      <SectionTitle>GPU sparing unit: module vs HGX board</SectionTitle>
+      <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead>
+            <tr className="border-b border-border bg-surface text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-4 py-3 font-semibold">Per-GPU AFR</th>
+              <th className="px-4 py-3 text-right font-semibold">Module stock S</th>
+              <th className="px-4 py-3 text-right font-semibold">Module capital</th>
+              <th className="px-4 py-3 text-right font-semibold">Board AFR</th>
+              <th className="px-4 py-3 text-right font-semibold">Board stock S</th>
+              <th className="px-4 py-3 text-right font-semibold">Board capital</th>
+            </tr>
+          </thead>
+          <tbody className="font-mono">
+            {rows.map((r, i) => (
+              <tr key={i} className="border-b border-border/70 last:border-0">
+                <td className="px-4 py-3">{pct(r.gpuAfr)}</td>
+                <td className="px-4 py-3 text-right font-semibold text-primary">{r.moduleStock}</td>
+                <td className="px-4 py-3 text-right">{money(r.moduleCapital)}</td>
+                <td className="px-4 py-3 text-right">{pct(r.boardAfr)}</td>
+                <td className="px-4 py-3 text-right font-semibold text-primary">{r.boardStock}</td>
+                <td className="px-4 py-3 text-right">{money(r.boardCapital)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {base && base.moduleCapital > 0 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          At the base case, sparing whole boards ties up {(base.boardCapital / base.moduleCapital).toFixed(1)}x the
+          capital of sparing modules ({whole(base.boardCapital)} vs {whole(base.moduleCapital)}).
+        </p>
+      )}
     </section>
   );
 }
