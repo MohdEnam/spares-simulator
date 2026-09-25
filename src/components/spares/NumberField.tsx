@@ -3,13 +3,13 @@ import { cn } from "@/lib/utils";
 interface Props {
   label: string;
   value: number;
-  onChange?: (v: number) => void;
-  suffix?: string;
-  step?: number;
-  source?: string;
-  sourceTone?: "muted" | "warning";
-  readOnly?: boolean;
-  error?: string;
+  onChange?: ((v: number) => void) | undefined;
+  suffix?: string | undefined;
+  step?: number | undefined;
+  source?: string | undefined;
+  sourceTone?: "muted" | "warning" | undefined;
+  readOnly?: boolean | undefined;
+  error?: string | undefined;
 }
 
 export function NumberField({
