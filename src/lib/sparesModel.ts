@@ -200,17 +200,24 @@ export interface SimResult {
   yearlyFilled: number[];
 }
 
+export const SIM_DAYS_PER_YEAR = 364;
+export const DAYS_PER_WEEK = 7;
+
+/**
+ * Daily-step simulation. `days` and `warmupDays` are in days; on-hand series
+ * records the level at the end of each (counted or not) week.
+ */
 export function simulate(
   input: PartInputs,
   stock: number,
-  weeks: number,
+  days: number,
   seed: number,
-  warmupWeeks = 0,
+  warmupDays = 0,
   recordSeries = true,
 ): SimResult {
   const rng = mulberry32(seed);
-  const weeklyRate = (input.fleetSize * input.afr) / WEEKS_PER_YEAR;
-  const lead = Math.max(1, Math.round(input.leadTimeWeeks));
+  const dailyRate = (input.fleetSize * input.afr) / SIM_DAYS_PER_YEAR;
+  const lead = Math.max(1, Math.round(input.leadTimeWeeks * DAYS_PER_WEEK));
   let onHand = stock;
   let backorders = 0;
   const arrivals = new Map<number, number>();
@@ -220,13 +227,14 @@ export function simulate(
   let stockouts = 0;
   let minOnHand = stock;
   let weeksWithStockout = 0;
+  let weekStockout = false;
   const yearlyFailures: number[] = [];
   const yearlyFilled: number[] = [];
 
-  for (let w = 0; w < weeks; w++) {
-    const due = arrivals.get(w) ?? 0;
+  for (let d = 0; d < days; d++) {
+    const due = arrivals.get(d) ?? 0;
     if (due) {
-      arrivals.delete(w);
+      arrivals.delete(d);
       let incoming = due;
       while (backorders > 0 && incoming > 0) {
         backorders--;
@@ -234,11 +242,10 @@ export function simulate(
       }
       onHand += incoming;
     }
-    const failures = poissonSample(weeklyRate, rng);
-    let weekStockout = false;
+    const counting = d >= warmupDays;
+    const yi = Math.floor((d - warmupDays) / SIM_DAYS_PER_YEAR);
+    const failures = poissonSample(dailyRate, rng);
     for (let f = 0; f < failures; f++) {
-      const counting = w >= warmupWeeks;
-      const yi = Math.floor((w - warmupWeeks) / WEEKS_PER_YEAR);
       if (counting) {
         totalFailures++;
         yearlyFailures[yi] = (yearlyFailures[yi] ?? 0) + 1;
@@ -251,17 +258,20 @@ export function simulate(
         }
       } else {
         backorders++;
-        weekStockout = true;
-        if (counting) stockouts++;
+        if (counting) {
+          stockouts++;
+          weekStockout = true;
+        }
       }
-      const arriveAt = w + lead;
+      const arriveAt = d + lead;
       arrivals.set(arriveAt, (arrivals.get(arriveAt) ?? 0) + 1);
     }
-    if (w >= warmupWeeks) {
-      if (onHand < minOnHand) minOnHand = onHand;
+    if (counting && onHand < minOnHand) minOnHand = onHand;
+    if ((d + 1) % DAYS_PER_WEEK === 0) {
       if (weekStockout) weeksWithStockout++;
+      weekStockout = false;
+      if (recordSeries) series.push(onHand);
     }
-    if (recordSeries) series.push(onHand);
   }
 
   return {
@@ -290,7 +300,7 @@ export function scenarioSeed(seed: number, scenario: number): number {
 }
 
 /**
- * Run independent scenarios of `years` each, with a warm-up of leadTimeWeeks
+ * Run independent scenarios of `years` each, with a warm-up of the lead time in days
  * (not counted). Scenario i uses classSeed(seed*1000 + i, classIndex).
  */
 export function simulateScenarios(
@@ -302,8 +312,8 @@ export function simulateScenarios(
   seed: number,
   classIndex: number,
 ): ScenarioSummary {
-  const warmup = Math.max(1, Math.round(input.leadTimeWeeks));
-  const weeks = years * WEEKS_PER_YEAR;
+  const warmup = Math.max(1, Math.round(input.leadTimeWeeks * DAYS_PER_WEEK));
+  const weeks = years * SIM_DAYS_PER_YEAR; // days
   let totFail = 0;
   let totFilled = 0;
   let yearsMet = 0;
