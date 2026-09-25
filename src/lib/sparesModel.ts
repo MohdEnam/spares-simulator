@@ -194,6 +194,9 @@ export interface SimResult {
   minOnHand: number;
   weeksWithStockout: number;
   onHandSeries: number[];
+  /** Per counted year (after warm-up): failures and filled-from-shelf. */
+  yearlyFailures: number[];
+  yearlyFilled: number[];
 }
 
 export function simulate(
@@ -216,6 +219,8 @@ export function simulate(
   let stockouts = 0;
   let minOnHand = stock;
   let weeksWithStockout = 0;
+  const yearlyFailures: number[] = [];
+  const yearlyFilled: number[] = [];
 
   for (let w = 0; w < weeks; w++) {
     const due = arrivals.get(w) ?? 0;
@@ -232,10 +237,17 @@ export function simulate(
     let weekStockout = false;
     for (let f = 0; f < failures; f++) {
       const counting = w >= warmupWeeks;
-      if (counting) totalFailures++;
+      const yi = Math.floor((w - warmupWeeks) / WEEKS_PER_YEAR);
+      if (counting) {
+        totalFailures++;
+        yearlyFailures[yi] = (yearlyFailures[yi] ?? 0) + 1;
+      }
       if (onHand > 0) {
         onHand--;
-        if (counting) filled++;
+        if (counting) {
+          filled++;
+          yearlyFilled[yi] = (yearlyFilled[yi] ?? 0) + 1;
+        }
       } else {
         backorders++;
         weekStockout = true;
@@ -259,5 +271,59 @@ export function simulate(
     minOnHand,
     weeksWithStockout,
     onHandSeries: series,
+    yearlyFailures,
+    yearlyFilled,
+  };
+}
+
+export interface ScenarioSummary {
+  avgFillRate: number;
+  pctYearsMeetingTarget: number;
+  worstYearFillRate: number;
+  avgStockoutsPerYear: number;
+}
+
+/** Seed for scenario i (0-based index i+1 used as offset): seed*1000 + i. */
+export function scenarioSeed(seed: number, scenario: number): number {
+  return seed * 1000 + scenario;
+}
+
+/**
+ * Run independent scenarios of `years` each, with a warm-up of leadTimeWeeks
+ * (not counted). Scenario i uses classSeed(seed*1000 + i, classIndex).
+ */
+export function simulateScenarios(
+  input: PartInputs,
+  stock: number,
+  targetFillRate: number,
+  years: number,
+  scenarios: number,
+  seed: number,
+  classIndex: number,
+): ScenarioSummary {
+  const warmup = Math.max(1, Math.round(input.leadTimeWeeks));
+  const weeks = years * WEEKS_PER_YEAR;
+  let totFail = 0;
+  let totFilled = 0;
+  let yearsMet = 0;
+  let yearCount = 0;
+  let worst = 1;
+  for (let i = 1; i <= scenarios; i++) {
+    const sim = simulate(input, stock, warmup + weeks, classSeed(scenarioSeed(seed, i), classIndex), warmup, false);
+    totFail += sim.totalFailures;
+    totFilled += sim.filled;
+    for (let y = 0; y < years; y++) {
+      const f = sim.yearlyFailures[y] ?? 0;
+      const fr = f > 0 ? (sim.yearlyFilled[y] ?? 0) / f : 1;
+      if (fr >= targetFillRate) yearsMet++;
+      if (fr < worst) worst = fr;
+      yearCount++;
+    }
+  }
+  return {
+    avgFillRate: totFail > 0 ? totFilled / totFail : 1,
+    pctYearsMeetingTarget: yearCount > 0 ? yearsMet / yearCount : 1,
+    worstYearFillRate: worst,
+    avgStockoutsPerYear: yearCount > 0 ? (totFail - totFilled) / yearCount : 0,
   };
 }
