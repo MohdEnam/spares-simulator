@@ -303,6 +303,9 @@ function Index() {
                     Prices checked 2026-09-24
                   </p>
                 </div>
+              </div>
+            </div>
+
 
             <div className={CARD_CLASS}>
               <h3 className="mb-4 font-semibold">GPUs (H100 SXM)</h3>
