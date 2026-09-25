@@ -89,4 +89,4 @@ npx vitest run
 
 ---
 
-Built by Enamullah Mohammad as a supply chain portfolio project. Frontend built with [Lovable](https://lovable.dev); math verified in Excel, Vitest and Python.
+Built by [Enamullah Mohammad](https://www.linkedin.com/in/mohdenam/) as a supply chain portfolio project. Frontend built with [Lovable](https://lovable.dev); math verified in Excel, Vitest and Python.
