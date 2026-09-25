@@ -32,14 +32,21 @@ export interface FormState {
     boardPrice: number;
     leadTimeWeeks: number;
     targetFillPct: number;
+    model: GpuModel;
+    customName: string;
+    customAfrPct: number;
+    customGpusPerBoard: number;
+    customBoardPrice: number;
   };
 }
+
+export type GpuModel = "h100" | "custom";
 
 export const DEFAULTS: FormState = {
   drives: { fleetSize: 500, afrPct: 1.36, leadTimeWeeks: 12, targetFillPct: 95, unitCost: 1079.99 },
   psus: { fleetSize: 400, mtbfHours: 500000, leadTimeWeeks: 8, targetFillPct: 95, unitCost: 531.16 },
   optics: { fleetSize: 1000, afrPct: 2.0, leadTimeWeeks: 16, targetFillPct: 95, pricing: "generic" },
-  gpus: { gpusInstalled: 1024, unit: "module", gpusPerBoard: 8, boardPrice: 179000, leadTimeWeeks: 8, targetFillPct: 95 },
+  gpus: { gpusInstalled: 1024, unit: "module", gpusPerBoard: 8, boardPrice: 179000, leadTimeWeeks: 8, targetFillPct: 95, model: "h100", customName: "Custom GPU", customAfrPct: 9.0762, customGpusPerBoard: 8, customBoardPrice: 179000 },
 };
 
 /** Meta Llama 3 run: 148 faulty GPU + 72 HBM3 interruptions, 16,384 GPUs, 54 days. */
@@ -48,11 +55,14 @@ export const GPU_CLUSTER = 16384;
 export const GPU_DAYS = 54;
 export const GPU_AFR = gpuAfrFromInterruptions(GPU_INTERRUPTIONS, GPU_CLUSTER, GPU_DAYS);
 
+export const gpuLabel = (g: FormState["gpus"]) =>
+  g.model === "custom" ? `GPUs (${g.customName.trim() || "Custom GPU"})` : "GPUs (H100 SXM)";
+
 export const gpuParams = (g: FormState["gpus"]): GpuParams => ({
   gpusInstalled: g.gpusInstalled,
-  gpusPerBoard: g.gpusPerBoard,
-  boardPrice: g.boardPrice,
-  gpuAfr: GPU_AFR,
+  gpusPerBoard: g.model === "custom" ? g.customGpusPerBoard : g.gpusPerBoard,
+  boardPrice: g.model === "custom" ? g.customBoardPrice : g.boardPrice,
+  gpuAfr: g.model === "custom" ? g.customAfrPct / 100 : GPU_AFR,
   leadTimeWeeks: g.leadTimeWeeks,
   targetFillRate: g.targetFillPct / 100,
 });

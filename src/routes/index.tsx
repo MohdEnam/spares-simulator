@@ -12,8 +12,8 @@ import {
 } from "@/components/spares/Comparisons";
 import { SimulationPanel } from "@/components/spares/SimulationPanel";
 import { SelfCheckPanel } from "@/components/spares/SelfCheckPanel";
-import { DEFAULTS, GPU_AFR, OPTICS_PRICES, gpuParams, psuAfr, type FormState } from "@/lib/defaults";
-import { boardAfr, computePart, gpuPartInputs, validatePart, type PartInputs } from "@/lib/sparesModel";
+import { DEFAULTS, GPU_AFR, OPTICS_PRICES, gpuLabel, gpuParams, psuAfr, type FormState } from "@/lib/defaults";
+import { boardAfr, computePart, gpuPartInputs, validateCustomGpu, validatePart, type PartInputs } from "@/lib/sparesModel";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -47,7 +47,10 @@ function Index() {
   const psuAfrValue = psuAfr(form.psus.mtbfHours);
   const opticsCost = OPTICS_PRICES[form.optics.pricing];
 
-  const gpuP = gpuParams(form.gpus);
+  const gpus = { ...DEFAULTS.gpus, ...form.gpus };
+  const isCustom = gpus.model === "custom";
+  const gpuName = gpuLabel(gpus);
+  const gpuP = gpuParams(gpus);
   const inputs: { Drives: PartInputs; PSUs: PartInputs; Optics: PartInputs; GPUs: PartInputs } = useMemo(
     () => ({
       Drives: {
@@ -71,7 +74,7 @@ function Index() {
         targetFillRate: form.optics.targetFillPct / 100,
         unitCost: opticsCost,
       },
-      GPUs: gpuPartInputs(gpuParams(form.gpus), form.gpus.unit),
+      GPUs: gpuPartInputs(gpuParams({ ...DEFAULTS.gpus, ...form.gpus }), form.gpus.unit),
     }),
     [form, psuAfrValue, opticsCost],
   );
@@ -82,7 +85,11 @@ function Index() {
     Optics: validatePart(inputs.Optics),
     GPUs: [
       ...validatePart(inputs.GPUs),
-      ...(form.gpus.gpusPerBoard >= 1 ? [] : [{ field: "gpusPerBoard", message: "GPUs per board must be at least 1" }]),
+      ...(isCustom
+        ? validateCustomGpu(gpus.customAfrPct, gpus.customGpusPerBoard, gpus.customBoardPrice)
+        : gpus.gpusPerBoard >= 1
+          ? []
+          : [{ field: "gpusPerBoard", message: "GPUs per board must be at least 1" }]),
     ],
   };
   const err = (cls: keyof typeof issues, field: string) =>
@@ -97,20 +104,20 @@ function Index() {
     { name: "Drives (HDD)", result: drivesResult },
     { name: "PSUs", result: psusResult },
     { name: "Optics (800G)", result: opticsResult },
-    { name: "GPUs (H100 SXM)", result: gpusResult },
+    { name: gpuName, result: gpusResult },
   ];
 
   const costs = {
     "Drives (HDD)": form.drives.unitCost,
     PSUs: form.psus.unitCost,
     "Optics (800G)": opticsCost,
-    "GPUs (H100 SXM)": inputs.GPUs.unitCost,
+    [gpuName]: inputs.GPUs.unitCost,
   };
   const targets = {
     "Drives (HDD)": form.drives.targetFillPct / 100,
     PSUs: form.psus.targetFillPct / 100,
     "Optics (800G)": form.optics.targetFillPct / 100,
-    "GPUs (H100 SXM)": form.gpus.targetFillPct / 100,
+    [gpuName]: form.gpus.targetFillPct / 100,
   };
 
   const set = <K extends keyof FormState>(key: K, patch: Partial<FormState[K]>) =>
@@ -310,13 +317,25 @@ function Index() {
 
 
             <div className={CARD_CLASS}>
-              <h3 className="mb-4 font-semibold">GPUs (H100 SXM)</h3>
+              <h3 className="mb-4 font-semibold">{gpuName}</h3>
               <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium" htmlFor="gpu-model">GPU model</label>
+                  <select
+                    id="gpu-model"
+                    value={gpus.model}
+                    onChange={(e) => set("gpus", { model: e.target.value as "h100" | "custom" })}
+                    className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="h100">NVIDIA H100 SXM (sourced)</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
                 <NumberField
                   label="GPUs installed"
                   value={form.gpus.gpusInstalled}
                   onChange={(v) => set("gpus", { gpusInstalled: v })}
-                  source={`= ${(form.gpus.gpusInstalled / (form.gpus.gpusPerBoard || 1)).toLocaleString("en-US", { maximumFractionDigits: 2 })} HGX boards`}
+                  source={`= ${(form.gpus.gpusInstalled / (gpuP.gpusPerBoard || 1)).toLocaleString("en-US", { maximumFractionDigits: 2 })} HGX boards`}
                   error={err("GPUs", "fleetSize")}
                 />
                 <div className="space-y-1">
@@ -340,14 +359,53 @@ function Index() {
                   <p className="font-mono text-[11px] leading-tight text-muted-foreground">
                     Unit cost{" "}
                     {"$" + inputs.GPUs.unitCost.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                    {form.gpus.unit === "module" ? ` (board price / ${form.gpus.gpusPerBoard} - proxy)` : ""}
+                    {form.gpus.unit === "module" ? ` (board price / ${gpuP.gpusPerBoard} - proxy)` : ""}
                   </p>
                   {form.gpus.unit === "board" && (
                     <p className="font-mono text-[11px] leading-tight text-muted-foreground">
-                      {(boardAfr(GPU_AFR, form.gpus.gpusPerBoard) * 100).toFixed(2)}% per board per year
+                      {(boardAfr(gpuP.gpuAfr, gpuP.gpusPerBoard) * 100).toFixed(2)}% per board per year
                     </p>
                   )}
                 </div>
+                {isCustom ? (
+                  <>
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium" htmlFor="gpu-name">GPU model name</label>
+                  <input
+                    id="gpu-name"
+                    type="text"
+                    maxLength={40}
+                    value={gpus.customName}
+                    onChange={(e) => set("gpus", { customName: e.target.value })}
+                    className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <NumberField
+                  label="Per-GPU AFR"
+                  suffix="%"
+                  step={0.01}
+                  value={gpus.customAfrPct}
+                  onChange={(v) => set("gpus", { customAfrPct: v })}
+                  error={err("GPUs", "customAfrPct")}
+                />
+                <NumberField
+                  label="GPUs per board"
+                  value={gpus.customGpusPerBoard}
+                  onChange={(v) => set("gpus", { customGpusPerBoard: v })}
+                  error={err("GPUs", "customGpusPerBoard")}
+                />
+                <NumberField
+                  label="Board price"
+                  suffix="$"
+                  step={100}
+                  value={gpus.customBoardPrice}
+                  onChange={(v) => set("gpus", { customBoardPrice: v })}
+                  error={err("GPUs", "customBoardPrice")}
+                />
+                <p className="text-[11px] leading-tight text-warning">User-entered values - not sourced.</p>
+                  </>
+                ) : (
+                  <>
                 <NumberField
                   label="GPUs per HGX board"
                   value={form.gpus.gpusPerBoard}
@@ -375,6 +433,8 @@ function Index() {
                     Derived from Meta Llama 3 run: (148 + 72) / 16,384 GPUs × 365 / 54 days. Interruption rate - likely an upper bound for physical replacements.
                   </p>
                 </div>
+                  </>
+                )}
                 <NumberField
                   label="Lead time"
                   suffix="weeks"
@@ -441,7 +501,7 @@ function Index() {
                   { name: "Drives (HDD)", input: inputs.Drives, result: drivesResult },
                   { name: "PSUs", input: inputs.PSUs, result: psusResult },
                   { name: "Optics (800G)", input: inputs.Optics, result: opticsResult },
-                  { name: "GPUs (H100 SXM)", input: inputs.GPUs, result: gpusResult },
+                  { name: gpuName, input: inputs.GPUs, result: gpusResult },
                 ]}
               />
             </section>
@@ -454,7 +514,7 @@ function Index() {
       <footer className="border-t border-border bg-card">
         <div className="mx-auto max-w-7xl px-6 py-6 text-xs text-muted-foreground">
           Fleet sizes and lead times are sample values. Prices checked 2026-09-24/25. Optics AFR is an
-          unsourced planner assumption. GPU AFR is derived from interruption data and is likely an upper bound.
+          unsourced planner assumption. GPU AFR (H100) is derived from interruption data and is likely an upper bound; Custom GPU values are user-entered.
         </div>
       </footer>
     </div>
