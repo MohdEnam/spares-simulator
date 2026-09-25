@@ -22,7 +22,7 @@ const pct = (v: number) => (v * 100).toFixed(2) + "%";
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"];
 
 export function SimulationPanel({ classes }: { classes: SimClass[] }) {
-  const [seed, setSeed] = useState(42);
+  const [seed, setSeed] = useState(11);
   const [year, setYear] = useState<{ name: string; sim: SimResult }[] | null>(null);
   const [long, setLong] = useState<{ name: string; sim: SimResult }[] | null>(null);
   const [busy, setBusy] = useState(false);
