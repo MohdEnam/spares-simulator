@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { classSeed, simulate, type PartInputs, type PartResult, type SimResult } from "@/lib/sparesModel";
+import { classSeed, simulate, simulateScenarios, type ScenarioSummary, type PartInputs, type PartResult, type SimResult } from "@/lib/sparesModel";
 
 export interface SimClass {
   name: string;
@@ -24,7 +24,8 @@ const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"];
 export function SimulationPanel({ classes }: { classes: SimClass[] }) {
   const [seed, setSeed] = useState(11);
   const [year, setYear] = useState<{ name: string; sim: SimResult }[] | null>(null);
-  const [long, setLong] = useState<{ name: string; sim: SimResult }[] | null>(null);
+  const [long, setLong] = useState<{ name: string; sum: ScenarioSummary }[] | null>(null);
+  const [horizon, setHorizon] = useState(1);
   const [busy, setBusy] = useState(false);
 
   const runYear = () => {
@@ -42,14 +43,7 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
       setLong(
         classes.map((c, i) => ({
           name: c.name,
-          sim: simulate(
-            c.input,
-            c.result.stock,
-            52000,
-            classSeed(seed, i),
-            Math.max(1, Math.round(c.input.leadTimeWeeks)),
-            false,
-          ),
+          sum: simulateScenarios(c.input, c.result.stock, c.input.targetFillRate, horizon, 1000, seed, i),
         })),
       );
       setBusy(false);
@@ -78,8 +72,20 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
         </div>
         <Button onClick={runYear}>Simulate a year</Button>
         <Button variant="outline" onClick={runLong} disabled={busy}>
-          {busy ? "Running…" : "Run 1,000 years"}
+          {busy ? "Running…" : "Run 1,000 scenarios"}
         </Button>
+        <div className="space-y-1">
+          <label className="block text-xs font-medium">Horizon</label>
+          <select
+            value={horizon}
+            onChange={(e) => setHorizon(Number(e.target.value))}
+            className="h-9 rounded-md border border-input bg-card px-3 text-sm shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value={1}>1 year</option>
+            <option value={3}>3 years</option>
+            <option value={5}>5 years</option>
+          </select>
+        </div>
       </div>
 
       {year && (
@@ -155,36 +161,33 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
       {long && (
         <div className="space-y-2">
           <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
-            <table className="w-full min-w-[620px] text-sm">
+            <table className="w-full min-w-[860px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-surface text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-4 py-3 font-semibold">Part class</th>
+                  <th className="px-4 py-3 text-right font-semibold">Avg simulated fill rate</th>
                   <th className="px-4 py-3 text-right font-semibold">Model achieved fill rate</th>
-                  <th className="px-4 py-3 text-right font-semibold">1,000-year simulated</th>
-                  <th className="px-4 py-3 text-right font-semibold">Difference</th>
+                  <th className="px-4 py-3 text-right font-semibold">Scenario-years meeting target</th>
+                  <th className="px-4 py-3 text-right font-semibold">Worst scenario-year</th>
+                  <th className="px-4 py-3 text-right font-semibold">Avg stockouts / yr</th>
                 </tr>
               </thead>
               <tbody className="font-mono">
-                {long.map(({ name, sim }, i) => {
-                  const model = classes[i]?.result.achievedFillRate ?? 0;
-                  const diff = (sim.fillRate - model) * 100;
-                  return (
-                    <tr key={name} className="border-b border-border/70 last:border-0">
-                      <td className="px-4 py-3 font-sans font-medium">{name}</td>
-                      <td className="px-4 py-3 text-right">{pct(model)}</td>
-                      <td className="px-4 py-3 text-right">{pct(sim.fillRate)}</td>
-                      <td className="px-4 py-3 text-right">
-                        {diff >= 0 ? "+" : ""}
-                        {diff.toFixed(2)} pp
-                      </td>
-                    </tr>
-                  );
-                })}
+                {long.map(({ name, sum }, i) => (
+                  <tr key={name} className="border-b border-border/70 last:border-0">
+                    <td className="px-4 py-3 font-sans font-medium">{name}</td>
+                    <td className="px-4 py-3 text-right">{pct(sum.avgFillRate)}</td>
+                    <td className="px-4 py-3 text-right">{pct(classes[i]?.result.achievedFillRate ?? 0)}</td>
+                    <td className="px-4 py-3 text-right">{(sum.pctYearsMeetingTarget * 100).toFixed(1)}%</td>
+                    <td className="px-4 py-3 text-right">{pct(sum.worstYearFillRate)}</td>
+                    <td className="px-4 py-3 text-right">{sum.avgStockoutsPerYear.toFixed(2)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
           <p className="text-xs text-muted-foreground">
-            The simulation counts failures in whole weeks, so it runs slightly above the model.
+            Each scenario is one data center over the chosen horizon. Averages land within about 1 point of the model; the spread shows how often a single year misses target.
           </p>
         </div>
       )}
