@@ -2,12 +2,13 @@ import { DEFAULTS, GPU_AFR, OPTICS_PRICES, gpuParams, psuAfr } from "./defaults"
 import {
   afrFromMtbf,
   boardAfr,
-  compareGpuSparingUnits,
-  computePart,
+  compareGpuSparingUnits as compareRaw,
+  computePart as computeRaw,
+  poissonCdf,
   gpuPartInputs,
   leadTimeDemand,
-  recommendedStock,
-  stockForCycleServiceLevel,
+  recommendedStock as recommendedRaw,
+  stockForCycleServiceLevel as cslRaw,
   type PartInputs,
 } from "./sparesModel";
 
@@ -19,6 +20,23 @@ export interface CheckLine {
 }
 
 const near = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol;
+const n = (v: number | null) => (v === null ? NaN : v);
+const recommendedStock = (l: number, t: number) => n(recommendedRaw(l, t));
+const stockForCycleServiceLevel = (l: number, t: number) => n(cslRaw(l, t));
+function computePart(i: PartInputs) {
+  const r = computeRaw(i);
+  return {
+    ...r,
+    stock: n(r.stock),
+    achievedFillRate: n(r.achievedFillRate),
+    cycleServiceLevel: n(r.cycleServiceLevel),
+    capital: n(r.capital),
+  };
+}
+function compareGpuSparingUnits(p: Parameters<typeof compareRaw>[0]) {
+  const r = compareRaw(p);
+  return { ...r, moduleStock: n(r.moduleStock), boardStock: n(r.boardStock) };
+}
 
 export function defaultPartInputs() {
   const drives: PartInputs = {
@@ -127,6 +145,24 @@ export function runSelfCheck(): CheckLine[] {
   const allBranded = driveOpticsBranded + p.capital + gm.capital;
   add("All-classes capital, Module (generic)", "509,883.59", allGeneric.toFixed(2), near(allGeneric, 509883.59, 0.01));
   add("All-classes capital, Module (branded)", "545,331.53", allBranded.toFixed(2), near(allBranded, 545331.53, 0.01));
+
+  // Large-fleet checks (log-space Poisson, no fixed search cap)
+  const big = gpuParams({ ...DEFAULTS.gpus, model: "h100", gpusInstalled: 100000, leadTimeWeeks: 8, targetFillPct: 95 });
+  const bm = computePart(gpuPartInputs(big, "module"));
+  add("100k GPUs module lambda", "1396.33", bm.lambda.toFixed(2), near(bm.lambda, 1396.33, 0.01));
+  add("100k GPUs module S @95%", "1459", bm.stock, bm.stock === 1459);
+  add("100k GPUs module fill rate", "0.9511", bm.achievedFillRate.toFixed(4), near(bm.achievedFillRate, 0.9511, 1e-4));
+  const bm999 = computePart({ ...gpuPartInputs(big, "module"), targetFillRate: 0.999 });
+  add("100k GPUs module S @99.9%", "1514", bm999.stock, bm999.stock === 1514);
+  const bb = computePart(gpuPartInputs(big, "board"));
+  add("100k GPUs board lambda", "1024.78", bb.lambda.toFixed(2), near(bb.lambda, 1024.78, 0.01));
+  add("100k GPUs board S @95%", "1079", bb.stock, bb.stock === 1079);
+  const s740a = recommendedStock(740, 0.95);
+  const s740b = recommendedStock(740, 0.999);
+  add("lambda 740 -> S @95%", "786", s740a, s740a === 786);
+  add("lambda 740 -> S @99.9%", "826", s740b, s740b === 826);
+  const cdfBig = poissonCdf(50000, 50000);
+  add("poissonCdf(50000, 50000) ~ 0.5", "0.5012", cdfBig.toFixed(4), near(cdfBig, 0.5012, 1e-3));
 
   return lines;
 }
