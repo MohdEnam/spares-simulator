@@ -15,21 +15,20 @@ import { SelfCheckPanel } from "@/components/spares/SelfCheckPanel";
 import { DEFAULTS, GPU_AFR, OPTICS_PRICES, gpuClassName, gpuParams, psuAfr, type FormState } from "@/lib/defaults";
 import { boardAfr, computePart, gpuPartInputs, validatePart, type PartInputs } from "@/lib/sparesModel";
 
+const META_DESCRIPTION =
+  "Size spare drives, PSUs, 800G optics and H100 GPUs for a data center fleet: Poisson base-stock model, capital view, module vs board GPU sparing, and a day-by-day 1,000-scenario simulation. Every input sourced or labeled.";
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Data Center Spares Sizing Simulator" },
       {
         name: "description",
-        content:
-          "Size spare drives, PSUs and optics for a data center fleet with a Poisson base-stock model, capital view and a seeded weekly simulation.",
+        content: META_DESCRIPTION,
       },
       { property: "og:title", content: "Data Center Spares Sizing Simulator" },
-      {
-        property: "og:description",
-        content:
-          "Poisson base-stock spares sizing for drives, PSUs and 800G optics, with fill rates, capital and a seeded 1,000-year simulation.",
-      },
+      { property: "og:description", content: META_DESCRIPTION },
+      { name: "twitter:description", content: META_DESCRIPTION },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
