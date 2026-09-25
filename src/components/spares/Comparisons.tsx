@@ -1,4 +1,4 @@
-import { OPTICS_PRICES } from "@/lib/defaults";
+import { OPTICS_PRICES, type OpticsPricing } from "@/lib/defaults";
 import {
   leadTimeDemand,
   poissonCdf,
@@ -95,17 +95,23 @@ export function OpticsPriceComparison({
   psus: PartResult;
   opticsStock: number;
 }) {
-  const rows = (["generic", "branded"] as const).map((k) => {
+  const build = (k: OpticsPricing) => {
     const opticsCapital = opticsStock * OPTICS_PRICES[k];
     return {
       key: k,
-      label: k === "generic" ? `Generic (${money(OPTICS_PRICES.generic)})` : `Branded (${money(OPTICS_PRICES.branded)})`,
+      label:
+        k === "generic"
+          ? `Generic (${money(OPTICS_PRICES.generic)})`
+          : `Branded (${money(OPTICS_PRICES.branded)})`,
       driveOptics: drives.capital + opticsCapital,
       all: drives.capital + opticsCapital + psus.capital,
     };
-  });
-  const diffDriveOptics = rows[1].driveOptics - rows[0].driveOptics;
-  const diffAll = rows[1].all - rows[0].all;
+  };
+  const generic = build("generic");
+  const branded = build("branded");
+  const rows = [generic, branded];
+  const diffDriveOptics = branded.driveOptics - generic.driveOptics;
+  const diffAll = branded.all - generic.all;
 
   return (
     <section>

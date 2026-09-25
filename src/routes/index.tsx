@@ -44,7 +44,7 @@ function Index() {
   const psuAfrValue = psuAfr(form.psus.mtbfHours);
   const opticsCost = OPTICS_PRICES[form.optics.pricing];
 
-  const inputs: Record<string, PartInputs> = useMemo(
+  const inputs: { Drives: PartInputs; PSUs: PartInputs; Optics: PartInputs } = useMemo(
     () => ({
       Drives: {
         fleetSize: form.drives.fleetSize,
@@ -80,13 +80,14 @@ function Index() {
     issues[cls].find((i) => i.field === field)?.message;
   const valid = Object.values(issues).every((l) => l.length === 0);
 
-  const rows: NamedResult[] | null = valid
-    ? [
-        { name: "Drives (HDD)", result: computePart(inputs.Drives) },
-        { name: "PSUs", result: computePart(inputs.PSUs) },
-        { name: "Optics (800G)", result: computePart(inputs.Optics) },
-      ]
-    : null;
+  const drivesResult = computePart(inputs.Drives);
+  const psusResult = computePart(inputs.PSUs);
+  const opticsResult = computePart(inputs.Optics);
+  const rows: NamedResult[] = [
+    { name: "Drives (HDD)", result: drivesResult },
+    { name: "PSUs", result: psusResult },
+    { name: "Optics (800G)", result: opticsResult },
+  ];
 
   const costs = {
     "Drives (HDD)": form.drives.unitCost,
@@ -296,7 +297,7 @@ function Index() {
           </div>
         </section>
 
-        {!valid || !rows ? (
+        {!valid ? (
           <div className="rounded-lg border border-destructive bg-destructive/5 p-5">
             <p className="text-sm font-semibold text-destructive">
               Fix the highlighted inputs to see results
@@ -323,9 +324,9 @@ function Index() {
             <PoissonVsNormal rows={rows} costs={costs} targets={targets} />
 
             <OpticsPriceComparison
-              drives={rows[0].result}
-              psus={rows[1].result}
-              opticsStock={rows[2].result.stock}
+              drives={drivesResult}
+              psus={psusResult}
+              opticsStock={opticsResult.stock}
             />
 
             <OpticsSensitivity optics={inputs.Optics} />
@@ -336,9 +337,9 @@ function Index() {
               </h2>
               <SimulationPanel
                 classes={[
-                  { name: "Drives (HDD)", input: inputs.Drives, result: rows[0].result },
-                  { name: "PSUs", input: inputs.PSUs, result: rows[1].result },
-                  { name: "Optics (800G)", input: inputs.Optics, result: rows[2].result },
+                  { name: "Drives (HDD)", input: inputs.Drives, result: drivesResult },
+                  { name: "PSUs", input: inputs.PSUs, result: psusResult },
+                  { name: "Optics (800G)", input: inputs.Optics, result: opticsResult },
                 ]}
               />
             </section>

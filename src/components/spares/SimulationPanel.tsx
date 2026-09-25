@@ -140,7 +140,7 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
                       key={c.name}
                       type="stepAfter"
                       dataKey={c.name}
-                      stroke={COLORS[i % COLORS.length]}
+                      stroke={COLORS[i % COLORS.length] ?? "var(--chart-1)"}
                       strokeWidth={2}
                       dot={false}
                     />
@@ -166,7 +166,7 @@ export function SimulationPanel({ classes }: { classes: SimClass[] }) {
               </thead>
               <tbody className="font-mono">
                 {long.map(({ name, sim }, i) => {
-                  const model = classes[i].result.achievedFillRate;
+                  const model = classes[i]?.result.achievedFillRate ?? 0;
                   const diff = (sim.fillRate - model) * 100;
                   return (
                     <tr key={name} className="border-b border-border/70 last:border-0">
