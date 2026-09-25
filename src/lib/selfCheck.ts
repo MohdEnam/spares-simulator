@@ -110,6 +110,19 @@ export function runSelfCheck(): CheckLine[] {
     add(`GPU AFR ${label} -> board S`, String(bExp), c.boardStock, c.boardStock === bExp);
   }
 
+  for (const [label, afrPct, per, price, mS, mC, bS, bC] of [
+    ["Custom (H100 values)", 9.0762, 8, 179000, 22, 492250, 17, 3043000],
+    ["Custom (5%, $300k board)", 5, 8, 300000, 14, 525000, 12, 3600000],
+  ] as const) {
+    const cp = gpuParams({ ...DEFAULTS.gpus, model: "custom", customAfrPct: afrPct, customGpusPerBoard: per, customBoardPrice: price });
+    const cm = computePart(gpuPartInputs(cp, "module"));
+    const cb = computePart(gpuPartInputs(cp, "board"));
+    add(`${label} module S`, String(mS), cm.stock, cm.stock === mS);
+    add(`${label} module capital`, mC.toLocaleString("en-US"), cm.capital.toFixed(2), near(cm.capital, mC, 0.01));
+    add(`${label} board S`, String(bS), cb.stock, cb.stock === bS);
+    add(`${label} board capital`, bC.toLocaleString("en-US"), cb.capital.toFixed(2), near(cb.capital, bC, 0.01));
+  }
+
   const allGeneric = driveOpticsGeneric + p.capital + gm.capital;
   const allBranded = driveOpticsBranded + p.capital + gm.capital;
   add("All-classes capital, Module (generic)", "509,883.59", allGeneric.toFixed(2), near(allGeneric, 509883.59, 0.01));
